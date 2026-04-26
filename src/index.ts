@@ -16,7 +16,7 @@ export function apply(ctx: Context, config: Config) {
     if (!session.content || !session.content.includes(config.separator))
       return next()
     const reduced = session.content.split(config.separator)
-      .reduceRight((acc, cur) => `${acc} $(${cur})`)
+      .reduceRight((acc, cur) => `${acc} $( ${cur} )`)
     session.execute(reduced)
   }, true)
 }

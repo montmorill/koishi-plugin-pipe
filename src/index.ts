@@ -7,17 +7,25 @@ const logger = new Logger(name)
 export interface Config {
   separator: string
   debug: boolean
-  indent: string
+  indent?: string
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     separator: Schema.string().default(' | '),
   }),
-  Schema.object({
-    debug: Schema.boolean().default(true).description('开启调试模式。'),
-    indent: Schema.string().default('\t').description('调试模式下的缩进。'),
-  }).description('高级设置'),
+  Schema.intersect([
+    Schema.object({
+      debug: Schema.boolean().default(false).description('开启调试模式。'),
+    }).description('高级设置'),
+    Schema.union([
+      Schema.object({
+        debug: Schema.const(true).required(),
+        indent: Schema.string().default('\t').description('调试模式下的缩进。'),
+      }),
+      Schema.object({}),
+    ]),
+  ]),
 ])
 
 export function apply(ctx: Context, config: Config) {
@@ -34,8 +42,8 @@ export function apply(ctx: Context, config: Config) {
 
   let depth = 0
   function resolvePipe(content: string): string {
-    // if (!config.debug)
-    //   return _resolvePipe(content)
+    if (!config.debug || !config.indent)
+      return _resolvePipe(content)
     logger.info(`${config.indent.repeat(depth++)}> ${content}`)
     const value = _resolvePipe(content)
     logger.info(`${config.indent.repeat(--depth)}< ${value}`)

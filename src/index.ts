@@ -17,7 +17,7 @@ export const Config: Schema<Config> = Schema.intersect([
   Schema.intersect([
     Schema.object({
       debug: Schema.boolean().default(false).description('开启调试模式。'),
-    }).description('高级设置'),
+    }),
     Schema.union([
       Schema.object({
         debug: Schema.const(true).required(),
@@ -25,7 +25,7 @@ export const Config: Schema<Config> = Schema.intersect([
       }),
       Schema.object({}),
     ]),
-  ]),
+  ]).description('高级设置'),
 ])
 
 export function apply(ctx: Context, config: Config) {
@@ -51,7 +51,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.middleware((session, next) => {
     if (!session.content || !session.content.includes(config.separator))
       return next()
-    session.execute(resolvePipe(session.elements?.filter(element =>
+    return session.execute(resolvePipe(session.elements?.filter(element =>
       element.type === 'text').join('') || ''))
   }, true)
 }

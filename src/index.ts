@@ -35,9 +35,7 @@ export function apply(ctx: Context, config: Config) {
         `$( ${resolvePipe(match)} )`)
     }
     return content.split(config.separator)
-      .reduce((acc, cur) => cur.includes('-')
-        ? cur.replace('-', `$( ${cur} )`)
-        : `${acc} $( ${cur} )`)
+      .reduce((acc, cur) => `${cur} $( ${acc} )`)
   }
 
   let depth = 0
@@ -53,6 +51,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.middleware((session, next) => {
     if (!session.content || !session.content.includes(config.separator))
       return next()
-    session.execute(resolvePipe(session.content))
+    session.execute(resolvePipe(session.elements?.filter(element =>
+      element.type === 'text').join('') || ''))
   }, true)
 }

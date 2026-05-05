@@ -6,26 +6,16 @@ const logger = new Logger(name)
 
 export interface Config {
   separator: string
-  debug: boolean
-  indent?: string
+  indent: string
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
-    separator: Schema.string().default(' | '),
+    separator: Schema.string().default(' | ').description('管道分隔符。'),
   }),
-  Schema.intersect([
-    Schema.object({
-      debug: Schema.boolean().default(false).description('开启调试模式。'),
-    }),
-    Schema.union([
-      Schema.object({
-        debug: Schema.const(true).required(),
-        indent: Schema.string().default('\t').description('调试模式下的缩进。'),
-      }),
-      Schema.object({}),
-    ]),
-  ]).description('高级设置'),
+  Schema.object({
+    indent: Schema.string().default('\t').description('缩进字符。'),
+  }).description('高级设置'),
 ])
 
 export function apply(ctx: Context, config: Config) {
@@ -40,18 +30,17 @@ export function apply(ctx: Context, config: Config) {
 
   let depth = 0
   function resolvePipe(content: string): string {
-    if (!config.debug || !config.indent)
-      return _resolvePipe(content)
-    logger.info(`${config.indent.repeat(depth++)}> ${content}`)
+    logger.debug(`${config.indent.repeat(depth++)}> ${content}`)
     const value = _resolvePipe(content)
-    logger.info(`${config.indent.repeat(--depth)}< ${value}`)
+    logger.debug(`${config.indent.repeat(--depth)}< ${value}`)
     return value
   }
 
   ctx.middleware((session, next) => {
     if (!session.content || !session.content.includes(config.separator))
       return next()
-    return session.execute(resolvePipe(session.elements?.filter(element =>
-      element.type === 'text').join('') || ''))
+    return session.execute(resolvePipe(session.elements
+      ?.filter(element => element.type === 'text')
+      .join('') || ''))
   }, true)
 }

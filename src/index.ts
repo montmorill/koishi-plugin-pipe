@@ -12,10 +12,8 @@ export interface Config {
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     separator: Schema.string().default(' | ').description('管道分隔符。'),
-  }),
-  Schema.object({
     indent: Schema.string().default('\t').description('缩进字符。'),
-  }).description('高级设置'),
+  }),
 ])
 
 export function apply(ctx: Context, config: Config) {

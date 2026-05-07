@@ -41,4 +41,7 @@ export function apply(ctx: Context, config: Config) {
       ?.filter(element => element.type === 'text')
       .join('') || ''))
   }, true)
+
+  ctx.command('xargs <message:text>')
+    .action(({ session }, message) => session?.execute(message, true))
 }

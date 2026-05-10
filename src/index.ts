@@ -42,6 +42,19 @@ export function apply(ctx: Context, config: Config) {
       .join('') || ''))
   }, true)
 
-  ctx.command('xargs <message:text>')
-    .action(({ session }, message) => session?.execute(message, true))
+  ctx.command('xargs <...args:string>', '执行指定命令。')
+    .option('count', '-n <count:number> 最大执行字段数。')
+    .action(({ session, options }, ...args) => {
+      if (!session)
+        return
+      const values = args.pop()?.split(/\s+/) || []
+      const command = args.join(' ') || 'echo'
+      const chunks: string[][] = []
+      while (values.length)
+        chunks.push(values.splice(0, options?.count || values.length))
+      const promises = chunks.map(chunk =>
+        session.execute(`${command} ${chunk.join(' ')}`, true))
+      return Promise.all(promises)
+        .then(results => results.map(result => result.join(' ')).join('\n'))
+    })
 }

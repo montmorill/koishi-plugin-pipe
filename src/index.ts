@@ -5,12 +5,16 @@ export const name = 'pipe'
 const logger = new Logger(name)
 
 export interface Config {
+  pipe: boolean
+  xargs: boolean
   separator: string
   indent: string
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
+    pipe: Schema.boolean().default(true).description('启用管道。'),
+    xargs: Schema.boolean().default(true).description('启用 xargs 函数。'),
     separator: Schema.string().default(' | ').description('管道分隔符。'),
     indent: Schema.string().default('\t').description('缩进字符。'),
   }),
@@ -34,7 +38,7 @@ export function apply(ctx: Context, config: Config) {
     return value
   }
 
-  ctx.middleware((session, next) => {
+  config.pipe && ctx.middleware((session, next) => {
     if (!session.content || !session.content.includes(config.separator))
       return next()
     return session.execute(resolvePipe(session.elements
@@ -42,7 +46,7 @@ export function apply(ctx: Context, config: Config) {
       .join('') || ''))
   }, true)
 
-  ctx.command('xargs <...args:string>', '执行指定命令。')
+  config.xargs && ctx.command('xargs <...args:string>', '执行指定命令。')
     .option('count', '-n <count:number> 最大执行字段数。')
     .action(({ session, options }, ...args) => {
       if (!session)

@@ -1,5 +1,5 @@
-import type { Context, Session } from 'koishi'
-import { Argv, h, Schema } from 'koishi'
+import type { Context, Session, Token } from 'koishi'
+import { Argv, clone, Schema } from 'koishi'
 
 export const name = 'pipe'
 
@@ -16,7 +16,7 @@ export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     pipe: Schema.boolean().default(true).description('启用管道。'),
     xargs: Schema.boolean().default(true).description('启用 xargs 函数。'),
-    separator: Schema.string().default(' | ').description('管道分隔符。'),
+    separator: Schema.string().default('|').description('管道分隔符。'),
     arguments: Schema.string().default(' -- ').description('参数分隔符。'),
     echo: Schema.string().default('echo').description('默认命令。'),
     indent: Schema.string().default('\t').description('缩进字符。'),
@@ -24,35 +24,66 @@ export const Config: Schema<Config> = Schema.intersect([
 ])
 
 export function apply(ctx: Context, config: Config) {
-  async function resolvePipe(session: Session) {
-    return session.content!.split(config.separator)
-      .map(item => Promise.resolve(item ? [h.text(item)] : []))
-      .reduce(async (previous, current) => {
-        const argv = Argv.parse((await current).join(' '))
-        argv.session = session
-        argv.tokens ??= []
-        const name = argv.tokens?.shift()?.content || config.echo
-        const command = ctx.$commander.get(name, session)
-        if (!command)
-          return await session?.send(`${name}: 未找到指令。`) && []
-        if (argv.tokens.length) {
-          argv.tokens[argv.tokens.length - 1].terminator
-            = command.name === 'xargs' ? config.arguments : ' '
-        }
-        argv.tokens.push(...(await previous).map((content, index, array) => ({
-          content: String(content),
-          quoted: true,
-          terminator: index === array.length - 1 ? '' : ' ',
-          inters: [],
-        })))
-        return session.execute(command.parse(argv), true)
-      }, Promise.resolve([]))
+  async function resolvePipe(
+    argv: Argv & Required<Pick<Argv, 'tokens'>>,
+    session: Session = argv.session!,
+  ) {
+    const segments: Token[][] = [[]]
+    let current = segments[0]
+    for (const token of argv.tokens) {
+      if (!token.quoted && token.content === config.separator) {
+        current[current.length - 1].terminator = ''
+        segments.push(current = [])
+      }
+      else {
+        current.push(token)
+      }
+    }
+    current[current.length - 1].terminator = ''
+    argv.tokens = segments.reverse().pop() || []
+    let elements = await session.execute(clone(argv), true)
+    for (const segment of segments) {
+      argv.tokens = segment
+      const name = argv.tokens[0].content || config.echo
+      const command = session.app.$commander.get(name, session)
+      if (argv.tokens.length) {
+        argv.tokens[argv.tokens.length - 1].terminator
+          = command.name === 'xargs' ? config.arguments : ' '
+      }
+      argv.tokens.push(...elements.map(content => ({
+        content: String(content),
+        quoted: true,
+        terminator: ' ',
+        inters: [],
+      })))
+      if (argv.tokens.length)
+        argv.tokens[argv.tokens.length - 1].terminator = ''
+      elements = await session.execute(clone(argv), true)
+    }
+
+    return elements
   }
 
   config.pipe && ctx.middleware(async (session, next) => {
     if (!session.content || !session.content.includes(config.separator))
       return next()
-    return await resolvePipe(session)
+    const argv = Argv.parse(session.content)
+    argv.tokens ??= []
+    const stack = []
+    for (const token of argv.tokens) {
+      for (const inter of token.inters) {
+        const execution = await session.execute(inter, true)
+        const transformed = await session.transform(execution)
+        stack.push(transformed.join(''))
+      }
+      for (const { pos } of token.inters.reverse()) {
+        token.content = token.content.slice(0, pos)
+          + stack.pop()
+          + token.content.slice(pos)
+      }
+      token.inters = []
+    }
+    return await resolvePipe(argv as any, session)
   }, true)
 
   config.xargs && ctx.command('xargs <command:text> -- <arguments:text>', '转发指令参数。')
@@ -73,7 +104,7 @@ export function apply(ctx: Context, config: Config) {
       const promises = chunks.map(async (chunk) => {
         chunk[chunk.length - 1].terminator = ''
         const argv = command.parse({ tokens: [...baseArgs, ...chunk] })
-        return (await session.execute(argv, true)).join(' ')
+        return (await session.execute(argv, true)).join('')
       }, true)
       return Promise.all(promises).then(lines => lines.join('\n'))
     })

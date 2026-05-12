@@ -1,5 +1,5 @@
 import type { Context, Session, Token } from 'koishi'
-import { Argv, clone, Schema } from 'koishi'
+import { Argv, clone, h, Schema } from 'koishi'
 
 export const name = 'pipe'
 
@@ -24,13 +24,28 @@ export const Config: Schema<Config> = Schema.intersect([
 ])
 
 export function apply(ctx: Context, config: Config) {
-  async function resolvePipe(
-    argv: Argv & Required<Pick<Argv, 'tokens'>>,
-    session: Session = argv.session!,
-  ) {
+  async function resolveInterpolation(argv: Argv, session: Session) {
+    const stack = []
+    for (const token of argv.tokens || []) {
+      for (const inter of token.inters) {
+        const execution = await executeWithPipe(inter, session)
+        const transformed = await session.transform(execution)
+        stack.push(transformed.join(''))
+      }
+      for (const { pos } of token.inters.reverse()) {
+        token.content = token.content.slice(0, pos)
+          + stack.pop()
+          + token.content.slice(pos)
+      }
+      token.inters = []
+    }
+  }
+
+  async function executeWithPipe(argv: Argv, session: Session = argv.session!) {
+    await resolveInterpolation(argv, session)
     const segments: Token[][] = [[]]
     let current = segments[0]
-    for (const token of argv.tokens) {
+    for (const token of argv.tokens || []) {
       if (!token.quoted && token.content === config.separator) {
         current[current.length - 1].terminator = ''
         segments.push(current = [])
@@ -56,34 +71,19 @@ export function apply(ctx: Context, config: Config) {
         terminator: ' ',
         inters: [],
       })))
-      if (argv.tokens.length)
-        argv.tokens[argv.tokens.length - 1].terminator = ''
+      if (argv.tokens.length) {
+        const lastToken = argv.tokens[argv.tokens.length - 1]
+        lastToken.terminator = lastToken.terminator.trimEnd()
+      }
       elements = await session.execute(clone(argv), true)
     }
-
-    return elements
+    return elements.length ? elements : [h.text(Argv.stringify(argv))]
   }
 
   config.pipe && ctx.middleware(async (session, next) => {
-    if (!session.content || !session.content.includes(config.separator))
-      return next()
-    const argv = Argv.parse(session.content)
-    argv.tokens ??= []
-    const stack = []
-    for (const token of argv.tokens) {
-      for (const inter of token.inters) {
-        const execution = await session.execute(inter, true)
-        const transformed = await session.transform(execution)
-        stack.push(transformed.join(''))
-      }
-      for (const { pos } of token.inters.reverse()) {
-        token.content = token.content.slice(0, pos)
-          + stack.pop()
-          + token.content.slice(pos)
-      }
-      token.inters = []
-    }
-    return await resolvePipe(argv as any, session)
+    if (session.content && session.content.includes(config.separator))
+      return await executeWithPipe(Argv.parse(session.content), session)
+    return next()
   }, true)
 
   config.xargs && ctx.command('xargs <command:text> -- <arguments:text>', '转发指令参数。')

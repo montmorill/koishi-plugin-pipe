@@ -58,7 +58,7 @@ export function apply(ctx: Context, config: Config) {
         return
       const [commands, args] = message.split(config.arguments)
       const [name, ...baseArgs] = Argv.parse(commands).tokens || []
-      baseArgs[baseArgs.length - 1].terminator = ' -- '
+      baseArgs[baseArgs.length - 1].terminator = config.arguments
       const command = ctx.$commander.get(name.content, session)
       const tokens = Argv.parse(args).tokens || []
       const chunks: (typeof tokens)[] = []

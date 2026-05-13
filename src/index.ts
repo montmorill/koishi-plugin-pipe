@@ -55,7 +55,7 @@ export function apply(ctx: Context, config: Config) {
       }
     }
     current[current.length - 1].terminator = ''
-    argv.tokens = segments.reverse().pop() || []
+    argv.tokens = segments.shift() || []
     let elements = await session.execute(clone(argv), true)
     for (const segment of segments) {
       argv.tokens = segment
@@ -65,12 +65,7 @@ export function apply(ctx: Context, config: Config) {
         argv.tokens[argv.tokens.length - 1].terminator
           = command.name === 'xargs' ? config.arguments : ' '
       }
-      argv.tokens.push(...elements.map(content => ({
-        content: String(content),
-        quoted: true,
-        terminator: ' ',
-        inters: [],
-      })))
+      argv.tokens.push(...Argv.parse(elements.join('')).tokens || [])
       if (argv.tokens.length) {
         const lastToken = argv.tokens[argv.tokens.length - 1]
         lastToken.terminator = lastToken.terminator.trimEnd()

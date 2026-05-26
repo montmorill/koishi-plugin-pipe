@@ -1,5 +1,5 @@
 import type { Context, Session, Token } from 'koishi'
-import { Argv, clone, h, Schema } from 'koishi'
+import { Argv, clone, Schema } from 'koishi'
 
 export const name = 'pipe'
 
@@ -72,7 +72,7 @@ export function apply(ctx: Context, config: Config) {
       }
       elements = await session.execute(clone(argv), true)
     }
-    return elements.length ? elements : [h.text(Argv.stringify(argv))]
+    return elements
   }
 
   config.pipe && ctx.middleware(async (session, next) => {

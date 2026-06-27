@@ -9,18 +9,18 @@ export interface Config {
   separator: string
   arguments: string
   echo: string
-  indent: string
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     pipe: Schema.boolean().default(true).description('启用管道。'),
     xargs: Schema.boolean().default(true).description('启用 xargs 函数。'),
+    echo: Schema.string().default('echo').description('默认命令。'),
+  }),
+  Schema.object({
     separator: Schema.string().default('|').description('管道分隔符。'),
     arguments: Schema.string().default('--').description('参数分隔符。'),
-    echo: Schema.string().default('echo').description('默认命令。'),
-    indent: Schema.string().default('\t').description('缩进字符。'),
-  }),
+  }).description('高级设置'),
 ])
 
 export function apply(ctx: Context, config: Config) {

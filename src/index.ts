@@ -85,6 +85,7 @@ export function apply(ctx: Context, config: Config) {
   }, true)
 
   config.xargs && ctx.command(`xargs <command:text> ${config.arguments} <arguments:text>`, '转发指令参数', { checkUnknown: true })
+    .option('echo', '-e 显示执行命令。')
     .option('count', '-n <count:number> 最大执行字段数')
     .option('count', '-1 对每个字段执行一次。', { value: 1 })
     .option('message', '-m 将每条结果作为独立消息输出。')
@@ -107,7 +108,9 @@ export function apply(ctx: Context, config: Config) {
       const promises = chunks.map(async (chunk) => {
         chunk[chunk.length - 1].terminator = ''
         const argv = command.parse({ tokens: [...baseArgs, ...chunk] })
-        return (await session.execute(argv, true)).join('')
+        const prefix = options?.echo ? `${argv.source}: ` : ''
+        const elements = await session.execute(argv, true)
+        return prefix + elements.join('')
       }, true)
 
       let separator = '<br/>'

@@ -116,6 +116,6 @@ export function apply(ctx: Context, config: Config) {
       if (options?.message)
         separator = '<message/>'
 
-      return Promise.all(promises).then(lines => lines.join(separator))
+      return Promise.all(promises).then(result => result.join(separator))
     })
 }

@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-pipe",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "为 Koishi 添加管道运算符",
   "typings": "lib/index.d.ts",
   "license": "MIT",

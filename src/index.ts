@@ -84,8 +84,11 @@ export function apply(ctx: Context, config: Config) {
     return next()
   }, true)
 
-  config.xargs && ctx.command(`xargs <command:text> ${config.arguments} <arguments:text>`, '转发指令参数')
+  config.xargs && ctx.command(`xargs <command:text> ${config.arguments} <arguments:text>`, '转发指令参数', { checkUnknown: true })
     .option('count', '-n <count:number> 最大执行字段数')
+    .option('count', '-1 对每个字段执行一次。', { value: 1 })
+    .option('message', '-m 将每条结果作为独立消息输出。')
+    .option('join', '-j 直接连接所有执行结果。')
     .action(({ session, options }, message) => {
       if (!session)
         return Promise.resolve('')
@@ -98,7 +101,7 @@ export function apply(ctx: Context, config: Config) {
       const command = ctx.$commander.get(name.content, session)
       const tokens = Argv.parse(args).tokens || []
       const chunks: (typeof tokens)[] = []
-      const chunkSize = (options as { count?: number }).count || tokens.length
+      const chunkSize = options?.count || tokens.length
       while (tokens.length)
         chunks.push(tokens.splice(0, chunkSize))
       const promises = chunks.map(async (chunk) => {
@@ -106,6 +109,13 @@ export function apply(ctx: Context, config: Config) {
         const argv = command.parse({ tokens: [...baseArgs, ...chunk] })
         return (await session.execute(argv, true)).join('')
       }, true)
-      return Promise.all(promises).then(lines => lines.join('\n'))
+
+      let separator = '<br/>'
+      if (options?.join)
+        separator = ''
+      if (options?.message)
+        separator = '<message/>'
+
+      return Promise.all(promises).then(lines => lines.join(separator))
     })
 }
